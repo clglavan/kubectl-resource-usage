@@ -1,0 +1,70 @@
+# kubectl-resource-usage
+
+# Build artifacts
+build/
+dist/
+
+# Go artifacts
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+
+# Test binary, built with `go test -c`
+*.test
+
+# Output of the go coverage tool
+*.out
+
+# Dependency directories
+vendor/
+
+# Go workspace files
+go.work
+go.work.sum
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Temporary files
+*.tmp
+*.temp
+
+# Logs
+*.log
+
+# Environment files
+.env
+.env.local
+.env.*.local
+
+# Configuration files (in case they contain sensitive data)
+*.config
+*.conf
+
+# Binary files (avoid committing built binaries)
+kubectl-resource_usage
+kubectl-resource_usage.exe
+kubectl-resource-usage-*
+
+# Krew manifests with real data (use template instead)
+resource-usage-*.yaml
+
+# Release files
+*.tar.gz
+*.zip
+*.sha256

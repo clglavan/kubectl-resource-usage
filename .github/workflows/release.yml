@@ -1,0 +1,100 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Tag to release'
+        required: true
+        type: string
+
+permissions:
+  contents: write
+  packages: write
+
+jobs:
+  build:
+    name: Build and Release
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+
+    - name: Set up Go
+      uses: actions/setup-go@v5
+      with:
+        go-version: '1.22'
+
+    - name: Get version
+      id: version
+      run: |
+        if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+          echo "VERSION=${{ github.event.inputs.tag }}" >> $GITHUB_OUTPUT
+        else
+          echo "VERSION=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
+        fi
+
+    - name: Cache Go modules
+      uses: actions/cache@v4
+      with:
+        path: ~/go/pkg/mod
+        key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
+        restore-keys: |
+          ${{ runner.os }}-go-
+
+    - name: Download dependencies
+      run: go mod download
+
+    - name: Build for all platforms
+      run: make build-all VERSION=${{ steps.version.outputs.VERSION }}
+
+    - name: Generate checksums
+      run: make checksums
+
+    - name: Update existing release with binaries
+      uses: softprops/action-gh-release@v2
+      with:
+        tag_name: ${{ steps.version.outputs.VERSION }}
+        files: |
+          dist/*.tar.gz
+          dist/*.sha256
+        # Don't specify name or body - keep what you created manually
+        draft: false
+        prerelease: false
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+    - name: Update Krew manifest
+      run: |
+        # Create updated manifest with real checksums
+        VERSION="${{ steps.version.outputs.VERSION }}"
+        
+        # Get checksums
+        LINUX_AMD64_SHA=$(cat dist/kubectl-resource-usage-linux-amd64.tar.gz.sha256 | cut -d' ' -f1)
+        LINUX_ARM64_SHA=$(cat dist/kubectl-resource-usage-linux-arm64.tar.gz.sha256 | cut -d' ' -f1)
+        DARWIN_AMD64_SHA=$(cat dist/kubectl-resource-usage-darwin-amd64.tar.gz.sha256 | cut -d' ' -f1)
+        DARWIN_ARM64_SHA=$(cat dist/kubectl-resource-usage-darwin-arm64.tar.gz.sha256 | cut -d' ' -f1)
+        WINDOWS_AMD64_SHA=$(cat dist/kubectl-resource-usage-windows-amd64.tar.gz.sha256 | cut -d' ' -f1)
+        
+        # Update manifest
+        sed -i "s/version: \"v0.1.0\"/version: \"${VERSION}\"/" resource-usage.yaml
+        sed -i "s|releases/download/v0.1.0|releases/download/${VERSION}|g" resource-usage.yaml
+        
+        # Update SHA256 values
+        sed -i "0,/sha256: \"REPLACE_WITH_ACTUAL_SHA256\"/{s/sha256: \"REPLACE_WITH_ACTUAL_SHA256\"/sha256: \"${LINUX_AMD64_SHA}\"/}" resource-usage.yaml
+        sed -i "0,/sha256: \"REPLACE_WITH_ACTUAL_SHA256\"/{s/sha256: \"REPLACE_WITH_ACTUAL_SHA256\"/sha256: \"${LINUX_ARM64_SHA}\"/}" resource-usage.yaml
+        sed -i "0,/sha256: \"REPLACE_WITH_ACTUAL_SHA256\"/{s/sha256: \"REPLACE_WITH_ACTUAL_SHA256\"/sha256: \"${DARWIN_AMD64_SHA}\"/}" resource-usage.yaml
+        sed -i "0,/sha256: \"REPLACE_WITH_ACTUAL_SHA256\"/{s/sha256: \"REPLACE_WITH_ACTUAL_SHA256\"/sha256: \"${DARWIN_ARM64_SHA}\"/}" resource-usage.yaml
+        sed -i "0,/sha256: \"REPLACE_WITH_ACTUAL_SHA256\"/{s/sha256: \"REPLACE_WITH_ACTUAL_SHA256\"/sha256: \"${WINDOWS_AMD64_SHA}\"/}" resource-usage.yaml
+
+    - name: Upload updated manifest
+      uses: actions/upload-artifact@v4
+      with:
+        name: krew-manifest
+        path: resource-usage.yaml
