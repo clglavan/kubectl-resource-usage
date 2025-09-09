@@ -2,8 +2,6 @@
 
 A powerful terminal-based user interface (TUI) for monitoring Kubernetes pod resource usage in real-time. This kubectl plugin provides an intuitive dashboard for observing CPU and memory consumption, resource requests/limits, HPA metrics, and cluster events across multiple namespaces.
 
-![Resource Usage Dashboard](https://via.placeholder.com/800x400?text=Resource+Usage+Dashboard+Screenshot)
-
 ## Features
 
 - 🔄 **Real-time monitoring** - Live updates of pod resource usage with configurable intervals
