@@ -33,11 +33,11 @@ spec:
     uri: https://github.com/clglavan/kubectl-resource-usage/releases/download/v0.1.0/kubectl-resource-usage-linux-amd64.tar.gz
     sha256: "REPLACE_WITH_ACTUAL_SHA256"
     files:
-    - from: kubectl-resource_usage
+    - from: kubectl-resource-usage
       to: .
     - from: LICENSE
       to: .
-    bin: kubectl-resource_usage
+    bin: kubectl-resource-usage
   - selector:
       matchLabels:
         os: linux
@@ -45,11 +45,11 @@ spec:
     uri: https://github.com/clglavan/kubectl-resource-usage/releases/download/v0.1.0/kubectl-resource-usage-linux-arm64.tar.gz
     sha256: "REPLACE_WITH_ACTUAL_SHA256"
     files:
-    - from: kubectl-resource_usage
+    - from: kubectl-resource-usage
       to: .
     - from: LICENSE
       to: .
-    bin: kubectl-resource_usage
+    bin: kubectl-resource-usage
   - selector:
       matchLabels:
         os: darwin
@@ -57,11 +57,11 @@ spec:
     uri: https://github.com/clglavan/kubectl-resource-usage/releases/download/v0.1.0/kubectl-resource-usage-darwin-amd64.tar.gz
     sha256: "REPLACE_WITH_ACTUAL_SHA256"
     files:
-    - from: kubectl-resource_usage
+    - from: kubectl-resource-usage
       to: .
     - from: LICENSE
       to: .
-    bin: kubectl-resource_usage
+    bin: kubectl-resource-usage
   - selector:
       matchLabels:
         os: darwin
@@ -69,11 +69,11 @@ spec:
     uri: https://github.com/clglavan/kubectl-resource-usage/releases/download/v0.1.0/kubectl-resource-usage-darwin-arm64.tar.gz
     sha256: "REPLACE_WITH_ACTUAL_SHA256"
     files:
-    - from: kubectl-resource_usage
+    - from: kubectl-resource-usage
       to: .
     - from: LICENSE
       to: .
-    bin: kubectl-resource_usage
+    bin: kubectl-resource-usage
   - selector:
       matchLabels:
         os: windows
@@ -81,8 +81,8 @@ spec:
     uri: https://github.com/clglavan/kubectl-resource-usage/releases/download/v0.1.0/kubectl-resource-usage-windows-amd64.tar.gz
     sha256: "REPLACE_WITH_ACTUAL_SHA256"
     files:
-    - from: kubectl-resource_usage.exe
+    - from: kubectl-resource-usage.exe
       to: .
     - from: LICENSE
       to: .
-    bin: kubectl-resource_usage.exe
+    bin: kubectl-resource-usage.exe
