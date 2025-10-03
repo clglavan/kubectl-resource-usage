@@ -83,8 +83,8 @@ jobs:
         WINDOWS_AMD64_SHA=$(cat dist/kubectl-resource-usage-windows-amd64.tar.gz.sha256 | cut -d' ' -f1)
         
         # Update manifest
-        sed -i "s/version: \"v0.1.0\"/version: \"${VERSION}\"/" resource-usage.yaml
-        sed -i "s|releases/download/v0.1.0|releases/download/${VERSION}|g" resource-usage.yaml
+        sed -i "s/version: \"v0.2.0\"/version: \"${VERSION}\"/" resource-usage.yaml
+        sed -i "s|releases/download/v0.2.0|releases/download/${VERSION}|g" resource-usage.yaml
         
         # Update SHA256 values
         sed -i "0,/sha256: \"REPLACE_WITH_ACTUAL_SHA256\"/{s/sha256: \"REPLACE_WITH_ACTUAL_SHA256\"/sha256: \"${LINUX_AMD64_SHA}\"/}" resource-usage.yaml
