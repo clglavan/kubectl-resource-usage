@@ -4,6 +4,8 @@ import (
 	"context"
 	"flag"
 	"fmt"
+	"io"
+	"log"
 	"os"
 	"os/signal"
 	"sort"
@@ -20,11 +22,19 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/clientcmd"
+	"k8s.io/klog/v2"
 	metricsv1beta1 "k8s.io/metrics/pkg/apis/metrics/v1beta1"
 	metrics "k8s.io/metrics/pkg/client/clientset/versioned"
 )
 
 func main() {
+	// Suppress klog output to prevent TUI glitches
+	klog.SetOutput(io.Discard)
+	klog.LogToStderr(false)
+
+	// Also suppress standard log output
+	log.SetOutput(io.Discard)
+
 	var kubeconfig string
 	var namespace string
 	var namespaces []string
@@ -81,8 +91,8 @@ func main() {
 		defer fmt.Print("\033[0;0m") // Reset on exit
 	}
 
-	// Add timeouts to prevent hanging
-	config.Timeout = 10 * time.Second
+	// Add timeouts to prevent hanging, but be more lenient
+	config.Timeout = 15 * time.Second
 
 	clientset, err := kubernetes.NewForConfig(config)
 	if err != nil {
@@ -174,7 +184,7 @@ func main() {
 	// Helper function to get HPA data with caching
 	getHPAData := func() map[string]*autoscalingv2.HorizontalPodAutoscaler {
 		hpaData.mutex.RLock()
-		if time.Since(hpaData.lastFetch) < 30*time.Second && len(hpaData.data) > 0 {
+		if time.Since(hpaData.lastFetch) < 60*time.Second && len(hpaData.data) > 0 {
 			defer hpaData.mutex.RUnlock()
 			return hpaData.data
 		}
@@ -185,12 +195,12 @@ func main() {
 		defer hpaData.mutex.Unlock()
 
 		// Double check in case another goroutine updated it
-		if time.Since(hpaData.lastFetch) < 30*time.Second && len(hpaData.data) > 0 {
+		if time.Since(hpaData.lastFetch) < 60*time.Second && len(hpaData.data) > 0 {
 			return hpaData.data
 		}
 
 		// Create context with timeout for this specific call
-		hpaCtx, hpaCancel := context.WithTimeout(ctx, 5*time.Second)
+		hpaCtx, hpaCancel := context.WithTimeout(ctx, 8*time.Second)
 		defer hpaCancel()
 
 		// Fetch HPA data from all namespaces
@@ -241,7 +251,7 @@ func main() {
 		}
 
 		// Create context with timeout for this specific call
-		rsCtx, rsCancel := context.WithTimeout(ctx, 3*time.Second)
+		rsCtx, rsCancel := context.WithTimeout(ctx, 5*time.Second)
 		defer rsCancel()
 
 		// Try to find the ReplicaSet in any of the namespaces
@@ -285,7 +295,12 @@ func main() {
 	}
 
 	// Update function with performance optimizations
+	var eventUpdateCounter int
 	updateData := func() {
+		// Only update events every 3rd cycle to reduce API pressure
+		eventUpdateCounter++
+		shouldUpdateEvents := eventUpdateCounter%3 == 0
+
 		// Use channels for concurrent API calls
 		type apiResult struct {
 			pods       *v1.PodList
@@ -302,20 +317,32 @@ func main() {
 		go func() {
 			var result apiResult
 			var wg sync.WaitGroup
-			wg.Add(len(namespaces) * 3) // pods, metrics, events for each namespace
 
-			// Collect all results
+			// Only fetch events every 3rd update to reduce API pressure
+			numTasks := len(namespaces) * 2 // pods + metrics
+			if shouldUpdateEvents {
+				numTasks += len(namespaces) // + events
+			}
+			wg.Add(numTasks)
+
+			// Collect all results with improved batching
 			var allPods []*v1.Pod
 			var allMetrics []*metricsv1beta1.PodMetrics
 			var allEvents []*v1.Event
 			var podsMutex, metricsMutex, eventsMutex sync.Mutex
 
-			// Fetch data from each namespace
+			// Use semaphore to limit concurrent API calls (max 5 at once)
+			semaphore := make(chan struct{}, 5)
+
+			// Fetch data from each namespace with rate limiting
 			for _, ns := range namespaces {
 				// Fetch pods for this namespace
 				go func(namespace string) {
 					defer wg.Done()
-					podsCtx, podsCancel := context.WithTimeout(ctx, 5*time.Second)
+					semaphore <- struct{}{}
+					defer func() { <-semaphore }()
+
+					podsCtx, podsCancel := context.WithTimeout(ctx, 6*time.Second)
 					defer podsCancel()
 					pods, err := clientset.CoreV1().Pods(namespace).List(podsCtx, metav1.ListOptions{})
 					if err != nil {
@@ -334,7 +361,10 @@ func main() {
 				// Fetch metrics for this namespace
 				go func(namespace string) {
 					defer wg.Done()
-					metricsCtx, metricsCancel := context.WithTimeout(ctx, 5*time.Second)
+					semaphore <- struct{}{}
+					defer func() { <-semaphore }()
+
+					metricsCtx, metricsCancel := context.WithTimeout(ctx, 6*time.Second)
 					defer metricsCancel()
 					metrics, err := metricsClient.MetricsV1beta1().PodMetricses(namespace).List(metricsCtx, metav1.ListOptions{})
 					if err != nil {
@@ -350,26 +380,32 @@ func main() {
 					metricsMutex.Unlock()
 				}(ns)
 
-				// Fetch events for this namespace
-				go func(namespace string) {
-					defer wg.Done()
-					eventsCtx, eventsCancel := context.WithTimeout(ctx, 5*time.Second)
-					defer eventsCancel()
-					events, err := clientset.CoreV1().Events(namespace).List(eventsCtx, metav1.ListOptions{
-						Limit: 100,
-					})
-					if err != nil {
-						if result.eventsErr == nil {
-							result.eventsErr = err
+				// Fetch events for this namespace (only every 3rd update)
+				if shouldUpdateEvents {
+					go func(namespace string) {
+						defer wg.Done()
+						semaphore <- struct{}{}
+						defer func() { <-semaphore }()
+
+						eventsCtx, eventsCancel := context.WithTimeout(ctx, 8*time.Second)
+						defer eventsCancel()
+						events, err := clientset.CoreV1().Events(namespace).List(eventsCtx, metav1.ListOptions{
+							Limit:          50,             // Reduced from 100 to reduce API load
+							TimeoutSeconds: &[]int64{5}[0], // Add timeout to the API call itself
+						})
+						if err != nil {
+							if result.eventsErr == nil {
+								result.eventsErr = err
+							}
+							return
 						}
-						return
-					}
-					eventsMutex.Lock()
-					for i := range events.Items {
-						allEvents = append(allEvents, &events.Items[i])
-					}
-					eventsMutex.Unlock()
-				}(ns)
+						eventsMutex.Lock()
+						for i := range events.Items {
+							allEvents = append(allEvents, &events.Items[i])
+						}
+						eventsMutex.Unlock()
+					}(ns)
+				}
 			}
 
 			wg.Wait()
@@ -385,9 +421,11 @@ func main() {
 				result.metrics.Items[i] = *metric
 			}
 
-			result.events = &v1.EventList{Items: make([]v1.Event, len(allEvents))}
-			for i, event := range allEvents {
-				result.events.Items[i] = *event
+			if shouldUpdateEvents {
+				result.events = &v1.EventList{Items: make([]v1.Event, len(allEvents))}
+				for i, event := range allEvents {
+					result.events.Items[i] = *event
+				}
 			}
 			resultChan <- result
 		}()
@@ -407,9 +445,7 @@ func main() {
 			}
 
 			// Get HPA data (cached)
-			hpaMap := getHPAData()
-
-			// Process results
+			hpaMap := getHPAData() // Process results
 			pods := result.pods
 			podMetricsList := result.metrics
 
@@ -662,8 +698,8 @@ func main() {
 				time.Now().Format("15:04:05"), len(pods.Items), namespacesStr)
 			statusBar.SetText(statusText)
 
-			// Update events if available
-			if result.events != nil && result.eventsErr == nil {
+			// Update events if available and should update
+			if shouldUpdateEvents && result.events != nil && result.eventsErr == nil {
 				// Sort events by timestamp (most recent first)
 				events := result.events.Items
 				sort.Slice(events, func(i, j int) bool {
@@ -725,35 +761,47 @@ func main() {
 		}
 	}
 
-	// First update
-	updateData()
+	// First update - make it non-blocking
+	go func() {
+		app.QueueUpdateDraw(func() {
+			updateData()
+		})
+	}()
 
-	// Schedule regular updates with better error handling
+	// Schedule regular updates with better error handling and no blocking
 	go func() {
 		ticker := time.NewTicker(time.Duration(refreshInterval) * time.Second)
 		defer ticker.Stop()
+
+		// Track ongoing updates to prevent overlapping
+		var updateMutex sync.Mutex
+		isUpdating := false
 
 		for {
 			select {
 			case <-ctx.Done():
 				return
 			case <-ticker.C:
+				// Skip update if one is already in progress
+				updateMutex.Lock()
+				if isUpdating {
+					updateMutex.Unlock()
+					continue
+				}
+				isUpdating = true
+				updateMutex.Unlock()
+
 				// Use a separate goroutine for updates to prevent blocking
 				go func() {
-					// Create a timeout context for this specific update
-					updateCtx, updateCancel := context.WithTimeout(ctx, 20*time.Second)
-					defer updateCancel()
-
-					// Replace the global context with the update context temporarily
-					originalCtx := ctx
-					ctx = updateCtx
+					defer func() {
+						updateMutex.Lock()
+						isUpdating = false
+						updateMutex.Unlock()
+					}()
 
 					app.QueueUpdateDraw(func() {
 						updateData()
 					})
-
-					// Restore original context
-					ctx = originalCtx
 				}()
 			}
 		}

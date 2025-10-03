@@ -1,7 +1,7 @@
 # Makefile for kubectl-resource-usage
 
 # Project settings
-BINARY_NAME := kubectl-resource_usage
+BINARY_NAME := kubectl-resource-usage
 PROJECT_NAME := kubectl-resource-usage
 VERSION ?= v0.1.0
 COMMIT_HASH := $(shell git rev-parse --short HEAD 2>/dev/null || echo "unknown")
