@@ -3,7 +3,7 @@ kind: Plugin
 metadata:
   name: resource-usage
 spec:
-  version: "v0.1.0"
+  version: "v0.2.0"
   homepage: https://github.com/clglavan/kubectl-resource-usage
   shortDescription: "Real-time Kubernetes pod resource usage monitor with TUI"
   description: |
@@ -30,7 +30,7 @@ spec:
       matchLabels:
         os: linux
         arch: amd64
-    uri: https://github.com/clglavan/kubectl-resource-usage/releases/download/v0.1.0/kubectl-resource-usage-linux-amd64.tar.gz
+    uri: https://github.com/clglavan/kubectl-resource-usage/releases/download/v0.2.0/kubectl-resource-usage-linux-amd64.tar.gz
     sha256: "REPLACE_WITH_ACTUAL_SHA256"
     files:
     - from: kubectl-resource-usage
@@ -42,7 +42,7 @@ spec:
       matchLabels:
         os: linux
         arch: arm64
-    uri: https://github.com/clglavan/kubectl-resource-usage/releases/download/v0.1.0/kubectl-resource-usage-linux-arm64.tar.gz
+    uri: https://github.com/clglavan/kubectl-resource-usage/releases/download/v0.2.0/kubectl-resource-usage-linux-arm64.tar.gz
     sha256: "REPLACE_WITH_ACTUAL_SHA256"
     files:
     - from: kubectl-resource-usage
@@ -54,7 +54,7 @@ spec:
       matchLabels:
         os: darwin
         arch: amd64
-    uri: https://github.com/clglavan/kubectl-resource-usage/releases/download/v0.1.0/kubectl-resource-usage-darwin-amd64.tar.gz
+    uri: https://github.com/clglavan/kubectl-resource-usage/releases/download/v0.2.0/kubectl-resource-usage-darwin-amd64.tar.gz
     sha256: "REPLACE_WITH_ACTUAL_SHA256"
     files:
     - from: kubectl-resource-usage
@@ -66,7 +66,7 @@ spec:
       matchLabels:
         os: darwin
         arch: arm64
-    uri: https://github.com/clglavan/kubectl-resource-usage/releases/download/v0.1.0/kubectl-resource-usage-darwin-arm64.tar.gz
+    uri: https://github.com/clglavan/kubectl-resource-usage/releases/download/v0.2.0/kubectl-resource-usage-darwin-arm64.tar.gz
     sha256: "REPLACE_WITH_ACTUAL_SHA256"
     files:
     - from: kubectl-resource-usage
@@ -78,7 +78,7 @@ spec:
       matchLabels:
         os: windows
         arch: amd64
-    uri: https://github.com/clglavan/kubectl-resource-usage/releases/download/v0.1.0/kubectl-resource-usage-windows-amd64.tar.gz
+    uri: https://github.com/clglavan/kubectl-resource-usage/releases/download/v0.2.0/kubectl-resource-usage-windows-amd64.tar.gz
     sha256: "REPLACE_WITH_ACTUAL_SHA256"
     files:
     - from: kubectl-resource-usage.exe
